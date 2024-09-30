@@ -20,9 +20,7 @@ const uri = process.env.MONGODB_URI;
 app.use(express.json());
 
 // Habilitar CORS para permitir solicitudes desde tu frontend
-app.use(cors({
-  origin: 'http://192.168.1.5:3000',
-}));
+app.use(cors());
 
 // Conectar a MongoDB y luego iniciar el servidor
 (async () => {
