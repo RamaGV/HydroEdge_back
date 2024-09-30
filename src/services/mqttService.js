@@ -1,42 +1,73 @@
 // src/services/mqttService.js
 
+require('dotenv').config(); // Asegurarse de que las variables de entorno estén disponibles
 const mqtt = require('mqtt');
 const { handleSensorMessage } = require('../mqtt_handlers/sensorHandler');
-const { handleActuatorMessage } = require('../mqtt_handlers/actuatorHandler');
+const { handleActuatorMessage } = require('../mqtt_handlers/actuadorHandler');
 
 class MqttService {
   constructor(brokerUrl) {
-    this.client = mqtt.connect(`mqtt://${brokerUrl}`);
+    this.brokerUrl = brokerUrl;
+    this.client = null;
+    this.cultivoId = "cultivo_001";
   }
 
   connect() {
-    this.client.on('connect', () => {
-      console.log('Connected to MQTT Broker');
-      this.client.subscribe('HYDRO/inv_1/sensores/#', (err) => {
-        if (!err) {
-          console.log('Subscribed to topic HYDRO/inv_1/sensores/#');
-        }
-      });
-      this.client.subscribe('HYDRO/inv_1/actuadores/#', (err) => {
-        if (!err) {
-          console.log('Subscribed to topic HYDRO/inv_1/actuadores/#');
-        }
-      });
-    });
-    
-    this.client.on('message', (topic, message) => {
-      if (topic.startsWith('HYDRO/inv_1/sensores/')) {
+    this.client = mqtt.connect(`mqtt://${this.brokerUrl}`);
+    this.client.on('connect', this.onConnect.bind(this));
+    this.client.on('message', this.onMessage.bind(this));
+  }
+
+  onConnect() {
+    console.log('Conectado al Broker MQTT');
+  }
+
+  onMessage(topic, message) {
+    if (this.cultivoId) {
+      if (topic.startsWith(`HydroEdge/${this.cultivoId}/sensores/`)) {
         handleSensorMessage(topic, message.toString());
-      } else 
-      if (topic.startsWith('HYDRO/inv_1/actuadores/')) {
+      } else if (topic.startsWith(`HydroEdge/${this.cultivoId}/actuadores/`)) {
         handleActuatorMessage(topic, message.toString());
       }
-    });
+    }
+  }
 
-    this.client.on('error', (err) => {
-      console.error('MQTT Connection error:', err);
-    });
+  subscribe(topic) {
+    if (this.client) {
+      this.client.subscribe(topic, (err) => {
+        if (err) console.error('Error de suscripción:', err);
+      });
+    } else {
+      console.error('Cliente MQTT no conectado.');
+    }
+  }
+
+  unsubscribe(topic) {
+    if (this.client) {
+      this.client.unsubscribe(topic, (err) => {
+        if (err) console.error('Error al desuscribirse:', err);
+      });
+    } else {
+      console.error('Cliente MQTT no conectado.');
+    }
+  }
+
+  publish(topic, message) {
+    if (this.client) {
+      this.client.publish(topic, message);
+    } else {
+      console.error('Cliente MQTT no conectado.');
+    }
+  }
+
+  setCultivoId(cultivoId) {
+    this.cultivoId = cultivoId;
   }
 }
 
-module.exports = MqttService;
+// Crear una instancia única de MqttService
+const mqttUrl = process.env.MQTT_URL;
+const mqttService = new MqttService(mqttUrl);
+
+// Exportar la instancia única
+module.exports = mqttService;
